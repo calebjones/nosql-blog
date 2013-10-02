@@ -1,17 +1,19 @@
-package com.btoddb.blog;
+package org.nosql.blog.cassandra;
+
+import org.nosql.blog.model.User;
 
 /**
  *
  *
  */
-public class User {
+public class CassandraUser implements User {
     private String email;
     private String password;
     private String name;
 
-    public User() {}
+    public CassandraUser() {}
 
-    public User(String email, String password, String name) {
+    public CassandraUser(String email, String password, String name) {
         this.email = email;
         this.password = password;
         this.name = name;
@@ -46,7 +48,7 @@ public class User {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        User user = (User) o;
+        CassandraUser user = (CassandraUser) o;
 
         if (email != null ? !email.equals(user.email) : user.email != null) return false;
 

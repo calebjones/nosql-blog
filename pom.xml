@@ -2,18 +2,20 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.btoddb</groupId>
-	<artifactId>cassandra-blog</artifactId>
+	<groupId>org.nosql</groupId>
+	<artifactId>nosql-blog</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
-	<name>cassandra-blog</name>
+	<name>nosql-blog</name>
 
 	<properties>
         <java.version>1.6</java.version>
         <hector.version>1.1-4</hector.version>
         <hom.version>3.1-09</hom.version>
 		<slf4j.version>1.6.1</slf4j.version>
+        <mockito-version>1.9.0</mockito-version>
+        <hamcrest-version>1.3</hamcrest-version>
 	</properties>
 
     <build>
@@ -96,6 +98,8 @@
             <artifactId>log4j</artifactId>
             <version>1.2.17</version>
         </dependency>
+        
+        <!-- Cassandra dependencies -->
         <dependency>
             <groupId>org.hectorclient</groupId>
             <artifactId>hector-core</artifactId>
@@ -106,6 +110,28 @@
             <artifactId>hector-object-mapper</artifactId>
             <version>${hom.version}</version>
         </dependency>
+        <!-- end Cassandra dependencies -->
+        
+        <!-- Mongo dependencies -->
+        <dependency>
+            <groupId>org.mongodb</groupId>
+            <artifactId>mongo-java-driver</artifactId>
+            <version>2.11.2</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-mongodb</artifactId>
+            <version>1.2.0.RELEASE</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mongojack</groupId>
+            <artifactId>mongojack</artifactId>
+            <version>2.0.0-RC5</version>
+        </dependency>
+        <!-- end Mongo depdendencies -->
+        
         <dependency>
           <groupId>org.apache.geronimo.specs</groupId>
           <artifactId>geronimo-jpa_2.0_spec</artifactId>
@@ -130,6 +156,20 @@
 			<version>4.8.1</version>
 			<scope>test</scope>
 		</dependency>
+        
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-all</artifactId>
+            <version>${hamcrest-version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-all</artifactId>
+            <version>${mockito-version}</version>
+            <scope>test</scope>
+        </dependency>
 <!-- 		<dependency> -->
 <!-- 			<groupId>org.slf4j</groupId> -->
 <!-- 			<artifactId>jcl-over-slf4j</artifactId> -->

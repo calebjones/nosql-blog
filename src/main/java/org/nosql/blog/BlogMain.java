@@ -1,9 +1,14 @@
-package com.btoddb.blog;
+package org.nosql.blog;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.nosql.blog.cassandra.BlogDaoCassandraImpl;
+import org.nosql.blog.model.Comment;
+import org.nosql.blog.model.Post;
+import org.nosql.blog.model.User;
+import org.nosql.blog.service.BlogServiceImpl;
 import org.apache.commons.lang.time.StopWatch;
 
 import java.util.List;
@@ -16,7 +21,7 @@ import java.util.UUID;
 public class BlogMain {
     private static final DateTimeFormatter dateFormatter = DateTimeFormat.forPattern("MMddYYYY:HHmmss").withZone(DateTimeZone.forOffsetHours(0));
 
-    private static BlogService service;
+    private static BlogServiceImpl service;
     private static BlogRenderer renderer;
 
     public static void main(String[] args) {
@@ -33,10 +38,10 @@ public class BlogMain {
         // a little dependency injection here
         //
 
-        BlogDao dao = new BlogDao();
+        BlogDaoCassandraImpl dao = new BlogDaoCassandraImpl("localhost:9170", "");
         dao.init();
 
-        service = new BlogService(dao);
+        service = new BlogServiceImpl(dao);
         renderer = new BlogRenderer(dao);
 
         //

@@ -1,11 +1,14 @@
-package com.btoddb.blog;
+package org.nosql.blog.cassandra;
+
+import java.util.UUID;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
 
 import me.prettyprint.hom.annotations.Column;
 import me.prettyprint.hom.annotations.Id;
 
-import javax.persistence.Entity;
-import javax.persistence.Table;
-import java.util.UUID;
+import org.nosql.blog.model.Comment;
 
 /**
  *
@@ -13,7 +16,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "comments")
-public class Comment {
+public class CassandraComment implements Comment {
     public static final String COL_POST_ID = "post_id";
     public static final String COL_CREATE_TS = "create_ts";
     public static final String COL_TEXT = "text";
@@ -39,10 +42,10 @@ public class Comment {
 
     private Long votes;
 
-    public Comment() {
+    public CassandraComment() {
     }
 
-    public Comment(UUID id, String userEmail, String userDisplayName, UUID postId, long createTimestamp, String text) {
+    public CassandraComment(UUID id, String userEmail, String userDisplayName, UUID postId, long createTimestamp, String text) {
         this.id = id;
         this.userEmail = userEmail;
         this.userDisplayName = userDisplayName;
@@ -112,7 +115,7 @@ public class Comment {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        Comment comment = (Comment) o;
+        CassandraComment comment = (CassandraComment) o;
 
         if (id != null ? !id.equals(comment.id) : comment.id != null) return false;
 

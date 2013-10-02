@@ -1,13 +1,16 @@
-package com.btoddb.blog;
+package org.nosql.blog.cassandra;
+
+import java.util.UUID;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
 
 import me.prettyprint.hom.annotations.Column;
 import me.prettyprint.hom.annotations.Id;
 import me.prettyprint.hom.converters.JodaTimeHectorConverter;
-import org.joda.time.DateTime;
 
-import javax.persistence.Entity;
-import javax.persistence.Table;
-import java.util.UUID;
+import org.joda.time.DateTime;
+import org.nosql.blog.model.Post;
 
 /**
  *
@@ -15,7 +18,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name="posts")
-public class Post {
+public class CassandraPost implements Post {
     public static final String POST_COL_USER_EMAIL = "user_email";
     public static final String POST_COL_USER_NAME = "user_display_name";
     public static final String POST_COL_TITLE = "title";
@@ -42,10 +45,10 @@ public class Post {
 
     private Long votes;
 
-    public Post() {
+    public CassandraPost() {
     }
 
-    public Post(UUID id, String userEmail, String userDisplayName, String title, DateTime createTimestamp, String text) {
+    public CassandraPost(UUID id, String userEmail, String userDisplayName, String title, DateTime createTimestamp, String text) {
         this.id = id;
         this.userEmail = userEmail;
         this.userDisplayName = userDisplayName;
@@ -115,7 +118,7 @@ public class Post {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        Post post = (Post) o;
+        CassandraPost post = (CassandraPost) o;
 
         if (id != null ? !id.equals(post.id) : post.id != null) return false;
 

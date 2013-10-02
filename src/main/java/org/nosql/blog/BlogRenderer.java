@@ -1,11 +1,15 @@
-package com.btoddb.blog;
+package org.nosql.blog;
+
+import java.util.List;
+import java.util.UUID;
 
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
-
-import java.util.List;
-import java.util.UUID;
+import org.nosql.blog.dao.BlogDao;
+import org.nosql.blog.model.Comment;
+import org.nosql.blog.model.Post;
+import org.nosql.blog.model.User;
 
 /**
  * Render Blog data to stdout.
@@ -38,10 +42,6 @@ public class BlogRenderer {
     }
 
     public void displayPost(Post p, boolean includeComments, String indent ) {
-        if ( dao.postCommentsNeedSorting(p.getId())) {
-            dao.sortCommentsByVotes(p.getId());
-        }
-
         if ( null == indent ) {
             indent = "";
         }
