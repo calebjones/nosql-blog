@@ -127,12 +127,10 @@ public class BlogDaoCassandraImpl implements BlogDao {
         entityManager.persist(Collections.singleton(post), m);
 
         // insert one-to-many for user->post : these are sorted by TimeUUID (chrono + unique)
-        // TODO - add params
         m.addInsertion(StringSerializer.get().toBytes(post.getUserEmail()), CF_USER_POSTS, HFactory.createColumn(post.getId(), EMPTY_BYTES));
 
-        // insert TimeUUID post ID to track order the posts were entered
+        // insert TimeUUID post ID so we can query by time range
         DateTime dt = calculatePostTimeGranularity(post.getCreateTimestamp());
-        // TODO - add params
         m.addInsertion(StringSerializer.get().toBytes(hourFormatter.print(dt)), CF_POSTS_BY_TIME, HFactory.createColumn(post.getId(), EMPTY_BYTES));
 
         // add a zero to counter so we don't miss one when sorting by votes - this leaves the counter at zero
@@ -153,7 +151,6 @@ public class BlogDaoCassandraImpl implements BlogDao {
         entityManager.persist(Collections.singleton(comment), m);
 
         // insert one-to-many for user->comments and post->comments : these are sorted by TimeUUID (chrono + unique)
-        // TODO - add params
         m.addInsertion(StringSerializer.get().toBytes(comment.getUserEmail()), CF_USER_COMMENTS, HFactory.createColumn(comment.getId(), EMPTY_BYTES));
         m.addInsertion(UUIDSerializer.get().toBytes(comment.getPostId()), CF_POST_COMMENTS, HFactory.createColumn(comment.getId(), EMPTY_BYTES));
 
@@ -341,7 +338,6 @@ public class BlogDaoCassandraImpl implements BlogDao {
 
     @Override
     public List<UUID> findCommentUUIDsByUser( String userEmail ) {
-        // TODO - comment out all of this!!!
         SliceQuery<String, UUID, byte[]> q = HFactory.createSliceQuery(keyspace, StringSerializer.get(), UUIDSerializer.get(), BytesArraySerializer.get());
         q.setColumnFamily(CF_USER_COMMENTS);
         q.setKey(userEmail);
