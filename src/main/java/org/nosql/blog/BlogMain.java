@@ -38,7 +38,7 @@ public class BlogMain {
         // a little dependency injection here
         //
 
-        BlogDaoCassandraImpl dao = new BlogDaoCassandraImpl("localhost:9170", "");
+        BlogDaoCassandraImpl dao = new BlogDaoCassandraImpl("localhost:9160", "blog");
         dao.init();
 
         service = new BlogServiceImpl(dao);
