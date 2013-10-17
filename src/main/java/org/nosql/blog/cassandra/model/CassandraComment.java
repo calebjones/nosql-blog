@@ -1,4 +1,4 @@
-package org.nosql.blog.cassandra;
+package org.nosql.blog.cassandra.model;
 
 import java.util.UUID;
 

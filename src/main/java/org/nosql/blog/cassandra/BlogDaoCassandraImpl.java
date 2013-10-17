@@ -38,6 +38,9 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.nosql.blog.cassandra.model.CassandraComment;
+import org.nosql.blog.cassandra.model.CassandraPost;
+import org.nosql.blog.cassandra.model.CassandraUser;
 import org.nosql.blog.dao.BlogDao;
 import org.nosql.blog.model.Comment;
 import org.nosql.blog.model.Post;
@@ -102,7 +105,7 @@ public class BlogDaoCassandraImpl implements BlogDao {
     private void initHector() {
         Cluster cluster = HFactory.getOrCreateCluster("training-cluster", host);
         keyspace = HFactory.createKeyspace(keyspaceName, cluster);
-        entityManager = new EntityManagerImpl(keyspace, "org.nosql.blog.model" );
+        entityManager = new EntityManagerImpl(keyspace, "org.nosql.blog.cassandra.model" );
     }
 
     @Override
@@ -125,12 +128,12 @@ public class BlogDaoCassandraImpl implements BlogDao {
 
         // insert one-to-many for user->post : these are sorted by TimeUUID (chrono + unique)
         // TODO - add params
-//        m.addInsertion(key, CF, column);
+        m.addInsertion(StringSerializer.get().toBytes(post.getUserEmail()), CF_USER_POSTS, HFactory.createColumn(post.getId(), EMPTY_BYTES));
 
         // insert TimeUUID post ID to track order the posts were entered
         DateTime dt = calculatePostTimeGranularity(post.getCreateTimestamp());
         // TODO - add params
-//        m.addInsertion(key, CF, column);
+        m.addInsertion(StringSerializer.get().toBytes(hourFormatter.print(dt)), CF_POSTS_BY_TIME, HFactory.createColumn(post.getId(), EMPTY_BYTES));
 
         // add a zero to counter so we don't miss one when sorting by votes - this leaves the counter at zero
         m.addCounter(UUIDSerializer.get().toBytes(post.getId()), CF_VOTES, HFactory.createCounterColumn("v", 0));
@@ -151,8 +154,8 @@ public class BlogDaoCassandraImpl implements BlogDao {
 
         // insert one-to-many for user->comments and post->comments : these are sorted by TimeUUID (chrono + unique)
         // TODO - add params
-//        m.addInsertion(key, CF, column);
-//        m.addInsertion(key, CF, column);
+        m.addInsertion(StringSerializer.get().toBytes(comment.getUserEmail()), CF_USER_COMMENTS, HFactory.createColumn(comment.getId(), EMPTY_BYTES));
+        m.addInsertion(UUIDSerializer.get().toBytes(comment.getPostId()), CF_POST_COMMENTS, HFactory.createColumn(comment.getId(), EMPTY_BYTES));
 
         // add a zero to counter so we don't miss one when sorting by votes - this leaves the counter at zero
         m.addCounter(UUIDSerializer.get().toBytes(comment.getId()), CF_VOTES, HFactory.createCounterColumn("v", 0));
@@ -193,7 +196,7 @@ public class BlogDaoCassandraImpl implements BlogDao {
 
     @Override
     public Post findPost( UUID postId ) {
-        Post p = entityManager.find(Post.class, postId);
+        Post p = entityManager.find(CassandraPost.class, postId);
         Map<UUID, Long> voteMap = findVotes(Collections.singletonList(postId));
         p.setVotes(voteMap.get(postId));
         return p;
@@ -201,7 +204,7 @@ public class BlogDaoCassandraImpl implements BlogDao {
 
     @Override
     public Comment findComment(UUID uuid) {
-        Comment c = entityManager.find( Comment.class, uuid);
+        Comment c = entityManager.find( CassandraComment.class, uuid);
         if ( null == c ) {
             return null;
         }
@@ -228,7 +231,7 @@ public class BlogDaoCassandraImpl implements BlogDao {
 
         Map<UUID, Post> postMap = new HashMap<UUID, Post>();
         for ( Row<UUID, String, byte[]> row : rows) {
-            postMap.put(row.getKey(), entityManager.find(Post.class, row.getKey(), row.getColumnSlice()));
+            postMap.put(row.getKey(), entityManager.find(CassandraPost.class, row.getKey(), row.getColumnSlice()));
         }
 
         // gotta do it this way to preserve ordering from the original UUID List
@@ -338,15 +341,18 @@ public class BlogDaoCassandraImpl implements BlogDao {
 
     @Override
     public List<UUID> findCommentUUIDsByUser( String userEmail ) {
-        // TODO - do it all!
+        // TODO - comment out all of this!!!
+        SliceQuery<String, UUID, byte[]> q = HFactory.createSliceQuery(keyspace, StringSerializer.get(), UUIDSerializer.get(), BytesArraySerializer.get());
+        q.setColumnFamily(CF_USER_COMMENTS);
+        q.setKey(userEmail);
+        q.setRange(null, null, false, 10);
 
-        // create a Slice Query
-
-        // use a column slice iterator
-
+        ColumnSliceIterator<String, UUID, byte[]> iter = new ColumnSliceIterator<String, UUID, byte[]>(q, null, (UUID)null, false);
         List<UUID> uuidList = new LinkedList<UUID>();
-
-        // iterator over filling in this list
+        while ( iter.hasNext() ) {
+            HColumn<UUID, byte[]> col = iter.next();
+            uuidList.add(col.getName());
+        }
 
         return uuidList;
     }
@@ -403,7 +409,7 @@ public class BlogDaoCassandraImpl implements BlogDao {
 
         Map<UUID, Comment> commentMap = new HashMap<UUID, Comment>();
         for ( Row<UUID, String, byte[]> row : rows) {
-            commentMap.put(row.getKey(), entityManager.find(Comment.class, row.getKey(), row.getColumnSlice()));
+            commentMap.put(row.getKey(), entityManager.find(CassandraComment.class, row.getKey(), row.getColumnSlice()));
         }
 
         // gotta do it this way to preserve ordering from the original UUID List
@@ -453,16 +459,12 @@ public class BlogDaoCassandraImpl implements BlogDao {
 
     @Override
     public void voteOnPost( String userEmail, UUID postId ) {
-        if ( null == findUserVote(userEmail, postId) ) {
-        	vote(userEmail, "POST", postId);
-        }
+        vote(userEmail, "POST", postId);
     }
 
     @Override
     public void voteOnComment( String userEmail, UUID commentId ) {
-        if ( null == findUserVote(userEmail, commentId) ) {
-        	vote(userEmail, "COMMENT", commentId);
-        }
+        vote(userEmail, "COMMENT", commentId);
     }
 
     @Override
