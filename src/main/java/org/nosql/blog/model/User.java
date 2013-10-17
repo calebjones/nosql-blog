@@ -11,4 +11,11 @@ public interface User {
     public String getName();
     public void setName(String name);
     
+
+	@Override
+	public int hashCode();
+
+	@Override
+	public boolean equals(Object obj);
+    
 }

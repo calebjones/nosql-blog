@@ -2,6 +2,8 @@ package org.nosql.blog.model;
 
 import java.util.UUID;
 
+import org.nosql.blog.mongo.MongoUser;
+
 public interface Comment {
 	
     public UUID getId();
@@ -24,5 +26,12 @@ public interface Comment {
 
     public Long getVotes();
     public void setVotes(Long votes);
+    
+
+	@Override
+	public int hashCode();
+
+	@Override
+	public boolean equals(Object obj);
     
 }

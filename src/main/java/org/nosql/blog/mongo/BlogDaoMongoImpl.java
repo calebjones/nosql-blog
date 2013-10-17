@@ -72,9 +72,9 @@ public class BlogDaoMongoImpl implements BlogDao {
 	@Override
 	public Comment saveComment(Comment comment) {
 		comment.setVotes(0L);
-		JacksonDBCollection<Comment, UUID> collection = 
-				JacksonDBCollection.wrap(getCommentCollection(), Comment.class, UUID.class);
-		org.mongojack.WriteResult<Comment, UUID> result = collection.save(comment);
+		JacksonDBCollection<MongoComment, UUID> collection = 
+				JacksonDBCollection.wrap(getCommentCollection(), MongoComment.class, UUID.class);
+		org.mongojack.WriteResult<MongoComment, UUID> result = collection.save((MongoComment)comment);
 		
 		if (result.getN() != 1) {
 			throw new RuntimeException("no comment saved");
@@ -100,14 +100,14 @@ public class BlogDaoMongoImpl implements BlogDao {
 	@Override
 	public Post findPost(UUID postId) {
 		Post post = mongoOps.findOne(new Query(Criteria.where("_id").is(postId)), 
-						Post.class, config.getPostCollection());
+						MongoPost.class, config.getPostCollection());
 		return post;
 	}
 
 	@Override
 	public Comment findComment(UUID uuid) {
-		JacksonDBCollection<Comment, UUID> collection = 
-				JacksonDBCollection.wrap(getCommentCollection(), Comment.class, UUID.class);
+		JacksonDBCollection<MongoComment, UUID> collection = 
+				JacksonDBCollection.wrap(getCommentCollection(), MongoComment.class, UUID.class);
 		Comment comment = collection.findOneById(uuid);
 		return comment;
 	}
@@ -124,25 +124,31 @@ public class BlogDaoMongoImpl implements BlogDao {
 		return postUUIDs;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public List<Post> findPostsByUser(String userEmail) {
-		return mongoOps.find(new Query(Criteria.where("userEmail").is(userEmail)), 
-				Post.class, config.getPostCollection());
+		// yay java type erasure!
+		List<?> posts = mongoOps.find(new Query(Criteria.where("userEmail").is(userEmail)), 
+				MongoPost.class, config.getPostCollection());
+		return (List<Post>) posts;
 	}
 
 	@Override
 	public List<UUID> findPostUUIDsByTimeRange(DateTime start, DateTime end) {
 		List<UUID> postUUIDs = new ArrayList<UUID>();
-		Query query = getTimeRangeQuery("createTimstamp", start, end);
+		Query query = getTimeRangeQuery("createTimestamp", start, end);
 		query.fields().include("_id");
 		mongoOps.executeQuery(query, config.getPostCollection(), new UUIDCollectingHandler(postUUIDs));
 		return postUUIDs;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public List<Post> findPostsByTimeRange(DateTime start, DateTime end) {
 		Query query = getTimeRangeQuery("createTimestamp", start, end);
-		return mongoOps.find(query, Post.class, config.getPostCollection());
+		// yay java type erasure!
+		List<?> posts = mongoOps.find(query, MongoPost.class, config.getPostCollection());
+		return (List<Post>)posts;
 	}
 
 	@Override
@@ -154,7 +160,7 @@ public class BlogDaoMongoImpl implements BlogDao {
 							   		   			 new BasicDBObject("_id", 1));
 		
 		while (cursor.hasNext()) {
-			commentUUIDs.add((UUID) cursor.next().get("_id"));
+			commentUUIDs.add(UUID.fromString((String)cursor.next().get("_id")));
 		}
 		
 		return commentUUIDs;
@@ -165,12 +171,12 @@ public class BlogDaoMongoImpl implements BlogDao {
 		List<UUID> commentUUIDs = new ArrayList<UUID>();
 		
 		DBCollection commentCollection = getCommentCollection();
-		DBCursor cursor = commentCollection.find(new BasicDBObject("postId", postId),
+		DBCursor cursor = commentCollection.find(new BasicDBObject("postId", postId.toString()),
 							   		   			 new BasicDBObject("_id", 1))
 						   		   		   .sort(new BasicDBObject("createTimestamp", 1));
 		
 		while (cursor.hasNext()) {
-			commentUUIDs.add((UUID) cursor.next().get("_id"));
+			commentUUIDs.add(UUID.fromString((String)cursor.next().get("_id")));
 		}
 		
 		return commentUUIDs;
@@ -181,12 +187,12 @@ public class BlogDaoMongoImpl implements BlogDao {
 		List<UUID> commentUUIDs = new ArrayList<UUID>();
 		
 		DBCollection commentCollection = getCommentCollection();
-		DBCursor cursor = commentCollection.find(new BasicDBObject("postId", postId),
+		DBCursor cursor = commentCollection.find(new BasicDBObject("postId", postId.toString()),
 							   		   			 new BasicDBObject("_id", 1))
 						   		   		   .sort(new BasicDBObject("votes", -1));
 		
 		while (cursor.hasNext()) {
-			commentUUIDs.add((UUID) cursor.next().get("_id"));
+			commentUUIDs.add(UUID.fromString((String)cursor.next().get("_id")));
 		}
 		
 		return commentUUIDs;
@@ -196,9 +202,9 @@ public class BlogDaoMongoImpl implements BlogDao {
 	public List<Comment> findCommentsByUUIDList(List<UUID> uuidList) {
 		List<Comment> comments = new ArrayList<Comment>();
 		
-		JacksonDBCollection<Comment, UUID> collection = 
-				JacksonDBCollection.wrap(getCommentCollection(), Comment.class, UUID.class);
-		org.mongojack.DBCursor<Comment> cursor = 
+		JacksonDBCollection<MongoComment, UUID> collection = 
+				JacksonDBCollection.wrap(getCommentCollection(), MongoComment.class, UUID.class);
+		org.mongojack.DBCursor<MongoComment> cursor = 
 				collection.find(new BasicDBObject("_id", new BasicDBObject("$in", uuidList)));
 		
 		while(cursor.hasNext()) {
@@ -212,9 +218,9 @@ public class BlogDaoMongoImpl implements BlogDao {
 	public List<Comment> findCommentsByUser(String userEmail) {
 		List<Comment> comments = new ArrayList<Comment>();
 		
-		JacksonDBCollection<Comment, UUID> collection = 
-				JacksonDBCollection.wrap(getCommentCollection(), Comment.class, UUID.class);
-		org.mongojack.DBCursor<Comment> cursor = 
+		JacksonDBCollection<MongoComment, UUID> collection = 
+				JacksonDBCollection.wrap(getCommentCollection(), MongoComment.class, UUID.class);
+		org.mongojack.DBCursor<MongoComment> cursor = 
 				collection.find(new BasicDBObject("userEmail", userEmail));
 		
 		while(cursor.hasNext()) {
@@ -237,11 +243,12 @@ public class BlogDaoMongoImpl implements BlogDao {
 	}
 
 	@Override
-	public void voteOnComment(String userEmail, UUID commentId) {
+	public void voteOnComment(String userEmail, UUID commentId) {;;
 		DBObject query = QueryBuilder
-				.start("_id").is(commentId)
+				.start("_id").is(commentId.toString())
 				.and("voters").notEquals(userEmail).get();
 		DBObject update = new BasicDBObject("$inc", new BasicDBObject("votes", 1));
+		update.put("$addToSet", new BasicDBObject("voters", userEmail));
 		
 		WriteResult result = getCommentCollection().update(query, update);
 		
@@ -254,24 +261,48 @@ public class BlogDaoMongoImpl implements BlogDao {
 	public Map<UUID, Long> findVotes(final List<UUID> uuidList) {
 		final Map<UUID, Long> votesMap = new ConcurrentHashMap<UUID, Long>();
 		
-		final Query query = new Query(Criteria.where("_id").in(uuidList));
+		Thread[] threads = new Thread[2];
 		
 		Thread commentsThread = new Thread() {
 			public void run() {
-				mongoOps.executeQuery(query, config.getCommentCollection(), 
-						new VotesCollectingHandler(votesMap));
+				List<String> uuidStrings = new ArrayList<String>(uuidList.size());
+				for(UUID uuid : uuidList) {
+					uuidStrings.add(uuid.toString());
+				}
+				
+				BasicDBObject query = new BasicDBObject("_id", new BasicDBObject("$in", uuidStrings));
+				BasicDBObject fields = new BasicDBObject("_id", 1);
+				fields.put("votes", 1);
+				DBCursor cursor = getCommentCollection().find(query, fields);
+				while (cursor.hasNext()) {
+					DBObject obj = cursor.next();
+					votesMap.put(UUID.fromString((String)obj.get("_id")), 
+							     (Long) obj.get("votes"));
+				}
 			}
 		};
+		threads[0] = commentsThread;
 		
 		Thread postsThread = new Thread() {
 			public void run() {
-				mongoOps.executeQuery(query, config.getPostCollection(), 
+				final Query votesQuery = new Query(Criteria.where("_id").in(uuidList));
+				mongoOps.executeQuery(votesQuery, config.getPostCollection(), 
 						new VotesCollectingHandler(votesMap));
 			}
 		};
+		threads[1] = postsThread;
 		
 		commentsThread.start();
 		postsThread.start();
+		
+		for (Thread thread : threads) {
+			try {
+				thread.join();
+			}
+			catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
+		}
 		
 		return votesMap;
 	}
@@ -280,7 +311,7 @@ public class BlogDaoMongoImpl implements BlogDao {
 	public DateTime findUserVote(String userEmail, UUID uuid) {
 		BasicDBObject query = new BasicDBObject();
 		query.put("email", userEmail);
-		query.put("id", uuid);
+		query.put("typeId", uuid);
 		
 		DBObject result = getVotesCollection().findOne(query, new BasicDBObject("ts", 1));
 		
@@ -290,7 +321,7 @@ public class BlogDaoMongoImpl implements BlogDao {
 	@Override
 	@SuppressWarnings("unchecked")
 	public List<Post> findPostsByVote(int number) {
-		Query query = new Query().with(new Sort(new Order(Direction.DESC, "votes")));
+		Query query = new Query().with(new Sort(new Order(Direction.DESC, "votes"))).limit(number);
 		List<? extends Post> posts = mongoOps.find(query, MongoPost.class, config.getPostCollection());
 		return (List<Post>) posts;
 	}
@@ -333,7 +364,7 @@ public class BlogDaoMongoImpl implements BlogDao {
 		BasicDBObject voteObj = new BasicDBObject();
 		voteObj.put("typeId", id);
 		voteObj.put("email", email);
-		voteObj.put("type", type);
+		voteObj.put("type", type.toString());
 		voteObj.put("ts", System.currentTimeMillis());
 		
 		return getVotesCollection().insert(voteObj);
@@ -376,7 +407,13 @@ public class BlogDaoMongoImpl implements BlogDao {
 		@Override
 		public void processDocument(DBObject dbObject) throws MongoException,
 				DataAccessException {
-			votesMap.put((UUID) dbObject.get("_id"), (Long) dbObject.get("votes"));
+			Object id = dbObject.get("_id");
+			if (id instanceof UUID) {
+				votesMap.put((UUID) dbObject.get("_id"), (Long) dbObject.get("votes"));
+			}
+			else {
+				votesMap.put(UUID.fromString((String)dbObject.get("_id")), (Long) dbObject.get("votes"));
+			}
 		}
 		
 	}

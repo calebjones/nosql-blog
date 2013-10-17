@@ -27,4 +27,11 @@ public interface Post {
     public Long getVotes();
     public void setVotes(Long votes);
     
+
+	@Override
+	public int hashCode();
+
+	@Override
+	public boolean equals(Object obj);
+    
 }

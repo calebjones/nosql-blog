@@ -1,13 +1,21 @@
 package org.nosql.blog.dao;
 
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.lessThan;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import org.hamcrest.collection.IsIterableContainingInAnyOrder;
+import org.hamcrest.collection.IsIterableContainingInOrder;
 import org.joda.time.DateTime;
 import org.junit.After;
 import org.junit.Before;
@@ -23,7 +31,7 @@ public abstract class BlogDaoIT {
 	protected static final String NAME = "Test E. Testington";
 	
 	@Autowired
-	private BlogDao dao;
+	protected BlogDao dao;
 	
 	/**
 	 * Called before each test.
@@ -149,92 +157,319 @@ public abstract class BlogDaoIT {
 		assertThat(postUUIDs, equalTo(postIdsInRange));
 	}
 	
+	@Test
+	public void testFindPostUUIDsAndPostsByTimeRangeEmpty() {
+		List<Post> foundPosts = dao.findPostsByTimeRange(new DateTime(3000, 1, 1, 0, 0),
+											new DateTime(4000, 1, 1, 0, 0));
+		assertThat(foundPosts, hasSize(0));
+		List<UUID> foundUUIDs = dao.findPostUUIDsByTimeRange(new DateTime(3000, 1, 1, 0, 0),
+				new DateTime(4000, 1, 1, 0, 0));
+		assertThat(foundUUIDs, hasSize(0));
+	}
 	
-	/*
-	 
+	@Test
+	public void testFindCommentUUIDsByUser() {
+		List<Post> posts = generatePosts(5);
+		List<UUID> commentUUIDs = new ArrayList<UUID>();
+		
+		for (int i = 0; i < posts.size(); i++) {
+			Comment comment = dao.generateNewComment(EMAIL, NAME, posts.get(i).getId(), 
+					System.currentTimeMillis(), "This is comment #" + (i+1));
+			Comment savedComment = dao.saveComment(comment);
+			commentUUIDs.add(savedComment.getId());
+		}
+		
+		List<UUID> returnedCommentUUIDs = dao.findCommentUUIDsByUser(EMAIL);
+		assertThat(returnedCommentUUIDs, 
+				IsIterableContainingInAnyOrder.containsInAnyOrder(commentUUIDs.toArray()));
+	}
+	
+	@Test
+	public void testFindCommentUUIDsByUserEmpty() {
+		assertThat(dao.findCommentUUIDsByUser(EMAIL), hasSize(0));
+	}
+	
+	@Test
+	public void testFindCommentUUIDsByPostSortedByTime() throws InterruptedException {
+		int numComments = 5;
+		Post post = dao.generateNewPost(EMAIL, NAME, "Post Title", 
+				new DateTime(), "This is a post.");
+		dao.savePost(post);
+		
+		List<UUID> commentUUIDs = new ArrayList<UUID>();
+		for (int i = 0; i < numComments; i++) {
+			Comment comment = dao.generateNewComment(EMAIL, NAME, post.getId(), 
+					System.currentTimeMillis(), "This is comment #" + (i+1));
+			Comment savedComment = dao.saveComment(comment);
+			commentUUIDs.add(savedComment.getId());
+			Thread.sleep(10L);
+		}
+		
+		List<UUID> returnedCommentUUIDs = dao.findCommentUUIDsByPostSortedByTime(post.getId());
+		assertThat(returnedCommentUUIDs, 
+				IsIterableContainingInOrder.contains(commentUUIDs.toArray()));
+		
+		long prevCreatedTimestamp = 0L;
+		for (UUID uuid : returnedCommentUUIDs) {
+			Comment comment = dao.findComment(uuid);
+			assertThat(comment.getCreateTimestamp(), greaterThan(prevCreatedTimestamp));
+			prevCreatedTimestamp = comment.getCreateTimestamp();
+		}
+	}
 
-    **
-     * Find all Comment UUIDs for a given user.
-     *
-     * @param userEmail user's email
-     * @return list of Comment IDs
-     *
-    public List<UUID> findCommentUUIDsByUser( String userEmail );
+	@Test
+	public void testFindCommentUUIDsByPostSortedByTimeEmpty() {
+		assertThat(dao.findCommentUUIDsByPostSortedByTime(UUID.randomUUID()), hasSize(0));
+	}
 
-    **
-     * Find a post's comment UUIDs sorted by time.  Uses the ColumnFamily, post_comments, as an index.
-     *
-     * @param postId post ID
-     * @return list of Comment IDs
-     *
-    public List<UUID> findCommentUUIDsByPostSortedByTime(UUID postId);
+	@Test
+	public void testFindCommentsByUser() {
+		List<Post> posts = generatePosts(5);
+		List<Comment> comments = new ArrayList<Comment>();
+		
+		for (int i = 0; i < posts.size(); i++) {
+			Comment comment = dao.generateNewComment(EMAIL, NAME, posts.get(i).getId(), 
+					System.currentTimeMillis(), "This is comment #" + (i+1));
+			Comment savedComment = dao.saveComment(comment);
+			comments.add(savedComment);
+		}
+		
+		List<Comment> returnedComments = dao.findCommentsByUser(EMAIL);
+		assertThat(returnedComments, 
+				IsIterableContainingInAnyOrder.containsInAnyOrder(comments.toArray()));
+	}
+	
+	@Test
+	public void testFindCommentsByUserEmpty() {
+		assertThat(dao.findCommentsByUser(EMAIL), hasSize(0));
+	}
 
-    **
-     * Find a post's comment UUIDs sorted by vote.  Uses the ColumnFamily, post_comments_sorted_by_vote, as an index.
-     *
-     * @param postId Post ID
-     * @return list of Comment IDs
-     *
-    public List<UUID> findCommentUUIDsByPostSortedByVotes(UUID postId);
 
-    **
-     * Find Comments given a list of Comment IDs.  It will also do a lookup to get the votes count for each Comment.
-     *
-     * @param uuidList Find Comment records given the list of Comment IDs
-     * @return list of Comment records
-     *
-    public List<Comment> findCommentsByUUIDList( List<UUID> uuidList );
+	@Test
+	public void testFindCommentsByUUIDList() {
+		List<Post> posts = generatePosts(5);
+		List<UUID> commentUUIDs = new ArrayList<UUID>();
+		List<Comment> comments = new ArrayList<Comment>();
+		
+		for (int i = 0; i < posts.size(); i++) {
+			Comment comment = dao.generateNewComment(EMAIL, NAME, posts.get(i).getId(), 
+					System.currentTimeMillis(), "This is comment #" + (i+1));
+			Comment savedComment = dao.saveComment(comment);
+			commentUUIDs.add(savedComment.getId());
+			comments.add(savedComment);
+		}
+		
+		List<Comment> returnedComments = dao.findCommentsByUUIDList(commentUUIDs);
+		assertThat(returnedComments, 
+				IsIterableContainingInAnyOrder.containsInAnyOrder(comments.toArray()));
+	}
+	
+	@Test
+	public void testFindCommentsByUUIDListEmptyParams() {
+		assertThat(dao.findCommentsByUUIDList(new ArrayList<UUID>()), hasSize(0));
+	}
+	
+	@SuppressWarnings("serial")
+	@Test
+	public void testVoteOnPost() {
+		final Post post = generatePosts(1).get(0);
+		
+		Post returnedPost = dao.findPost(post.getId());
+		assertThat(returnedPost.getVotes(), equalTo(0L));
+		Map<UUID, Long> votes = dao.findVotes(new ArrayList<UUID>() {{add(post.getId());}});
+		assertThat(votes.size(), equalTo(1));
+		assertThat(votes.get(post.getId()), equalTo(post.getVotes()));
+		
+		dao.voteOnPost(EMAIL, returnedPost.getId());
+		Post votedPost = dao.findPost(post.getId());
+		assertThat(votedPost.getVotes(), equalTo(1L));
+		votes = dao.findVotes(new ArrayList<UUID>() {{add(post.getId());}});
+		assertThat(votes.size(), equalTo(1));
+		assertThat(votes.get(post.getId()), equalTo(1L));
+		
+		dao.voteOnPost(EMAIL, returnedPost.getId());
+		Post secondVotedPost = dao.findPost(post.getId());
+		assertThat(secondVotedPost.getVotes(), equalTo(1L));
+		Map<UUID, Long> secondVotes = dao.findVotes(new ArrayList<UUID>() {{add(post.getId());}});
+		assertThat(secondVotes.size(), equalTo(1));
+		assertThat(secondVotes.get(post.getId()), equalTo(1L));
+	}
+	
+	@SuppressWarnings("serial")
+	@Test
+	public void testVoteOnPostNotExist() {
+		final UUID uuid = UUID.randomUUID();
+		dao.voteOnPost(EMAIL, uuid);
+		Map<UUID, Long> votes = dao.findVotes(new ArrayList<UUID>() {{add(uuid);}});
+		assertThat(votes.size(), equalTo(0));
+	}
 
-    **
-     * Find all Comments for the given user email.
-     *
-     * @param userEmail user's email
-     * @return list of Comment records
-     *
-    public List<Comment> findCommentsByUser( String userEmail );
-
-    **
-     * Vote on a Post.
-     *
-     * @param userEmail User's email
-     * @param postId Post ID
-     *
-    public void voteOnPost( String userEmail, UUID postId );
-
-    **
-     * Vote on a comment and signal that the Post needs its "comments sorted by vote" index updated.
-     *
-     * @param userEmail user's email
-     * @param commentId Comment ID
-     *
-    public void voteOnComment( String userEmail, UUID commentId );
-
-    **
-     * Find the vote counts for the list of UUIDs.  Since UUIDs are unique it doesn't matter if the UUID
-     * is for a Post or a Comment.
-     *
-     * @param uuidList list of Comment or Post IDs
-     * @return Comment/Post ID mapping to number of votes
-     *
-    public Map<UUID, Long> findVotes( List<UUID> uuidList );
-
-    **
-     * Find the timestamp, if any, when a User voted on a Post or Comment.
-     *
-     * @param userEmail User's email
-     * @param uuid Post/Comment ID
-     * @return Timestamp of when the user voted if found, null otherwise
-     *
-    public DateTime findUserVote(String userEmail, UUID uuid);
-
-    **
-     * Find 'number' of Posts ordered by their votes.  Uses the ColumnFamily, posts_sorted_by_vote, as an
-     * index to speed up search.
-     *
-     * @param number Number of Posts to return
-     * @return List of Post records
-     *
-    public List<Post> findPostsByVote(int number);
-    
-	 */
+	
+	@SuppressWarnings("serial")
+	@Test
+	public void testVoteOnComment() {
+		final Post post = generatePosts(1).get(0);
+		
+		final Comment comment = dao.generateNewComment(EMAIL, NAME, post.getId(), 
+				System.currentTimeMillis(), "This is a comment.");
+		dao.saveComment(comment);
+		
+		Comment returnedComment = dao.findComment(comment.getId());
+		assertThat(returnedComment.getVotes(), equalTo(0L));
+		
+		dao.voteOnComment(EMAIL, comment.getId());
+		Comment votedComment = dao.findComment(comment.getId());
+		assertThat(votedComment.getVotes(), equalTo(1L));
+		Map<UUID, Long> votes = dao.findVotes(new ArrayList<UUID>() {{add(comment.getId());}});
+		assertThat(votes.size(), equalTo(1));
+		assertThat(votes.get(comment.getId()), equalTo(1L));
+		
+		dao.voteOnComment(EMAIL, comment.getId());
+		Comment secondVotedComment = dao.findComment(comment.getId());
+		assertThat(secondVotedComment.getVotes(), equalTo(1L));
+		Map<UUID, Long> secondVotes = dao.findVotes(new ArrayList<UUID>() {{add(comment.getId());}});
+		assertThat(secondVotes.size(), equalTo(1));
+		assertThat(secondVotes.get(comment.getId()), equalTo(1L));
+	}
+	
+	@SuppressWarnings("serial")
+	@Test
+	public void testVoteOnCommentNotExist() {
+		final UUID uuid = UUID.randomUUID();
+		dao.voteOnComment(EMAIL, uuid);
+		Map<UUID, Long> votes = dao.findVotes(new ArrayList<UUID>() {{add(uuid);}});
+		assertThat(votes.size(), equalTo(0));
+	}
+	
+	@Test
+	public void testFindUserVote() {
+		DateTime start = new DateTime();
+		
+		Post post = generatePosts(1).get(0);
+		
+		Comment comment = dao.generateNewComment(EMAIL, NAME, post.getId(), 
+				System.currentTimeMillis(), "This is a comment.");
+		dao.saveComment(comment);
+		
+		DateTime time = dao.findUserVote(EMAIL, post.getId());
+		assertThat(time, nullValue());
+		time = dao.findUserVote(EMAIL, comment.getId());
+		assertThat(time, nullValue());
+		
+		dao.voteOnPost(EMAIL, post.getId());
+		time = dao.findUserVote(EMAIL, post.getId());
+		assertThat(time, notNullValue());
+		assertTrue("vote timestamp invalid", time.isAfter(start));
+		
+		dao.voteOnComment(EMAIL, comment.getId());
+		time = dao.findUserVote(EMAIL, comment.getId());
+		assertThat(time, notNullValue());
+		assertTrue("vote timestamp invalid", time.isAfter(start));
+	}
+	
+	@Test
+	public void testFindUserVoteUUIDNotExist() {
+		DateTime time = dao.findUserVote(EMAIL, UUID.randomUUID());
+		assertThat(time, nullValue());
+	}
+	
+	@Test
+	public void testFindCommentUUIDsByPostSortedByVotes() {
+		int numComments = 5;
+		List<UUID> createdCommentUUIDs = new ArrayList<UUID>(numComments);
+		
+		Post post = generatePosts(1).get(0);
+		for (int i = 0; i < numComments; i++) {
+			Comment comment = dao.generateNewComment(EMAIL, NAME, post.getId(), 
+					System.currentTimeMillis(), "Comment #" + (i+1));
+			dao.saveComment(comment);
+			createdCommentUUIDs.add(comment.getId());
+			
+			for (int j = i; j < numComments; j++) {
+				String email = "user" + j + "@test.com";
+				if (null == dao.findUser(email)) {
+					dao.saveUser(dao.generateNewUser(email, "asdf", "Test User" + (j+1)));
+				}
+				dao.voteOnComment(email, comment.getId());
+			}
+		}
+		
+		List<UUID> commentUUIDs = dao.findCommentUUIDsByPostSortedByVotes(post.getId());
+		assertThat(commentUUIDs, 
+				IsIterableContainingInAnyOrder.containsInAnyOrder(createdCommentUUIDs.toArray()));
+		Long prevVotes = numComments * 2L;
+		for (UUID uuid : commentUUIDs) {
+			Comment curComment = dao.findComment(uuid);
+			assertThat(curComment.getVotes(), lessThan(prevVotes));
+			prevVotes = curComment.getVotes();
+		}
+	}
+	
+	@Test
+	public void testFindCommentUUIDsByPostSortedByVotesPostNotExist() {
+		List<UUID> uuids = dao.findCommentUUIDsByPostSortedByVotes(UUID.randomUUID());
+		assertThat(uuids.size(), equalTo(0));
+	}
+	
+	@Test
+	public void testFindCommentUUIDsByPostSortedByVotesPostNoComments() {
+		Post post = generatePosts(1).get(0);
+		List<UUID> uuids = dao.findCommentUUIDsByPostSortedByVotes(post.getId());
+		assertThat(uuids.size(), equalTo(0));
+	}
+	
+	@Test
+	public void testFindPostsByVote() {
+		int numPosts = 5;
+		List<Post> createdPosts = new ArrayList<Post>(numPosts);
+		
+		for (int i = 0; i < numPosts; i++) {
+			Post post = generatePosts(1).get(0);
+			dao.savePost(post);
+			createdPosts.add(post);
+			
+			for (int j = i; j < numPosts; j++) {
+				String email = "user" + j + "@test.com";
+				if (null == dao.findUser(email)) {
+					dao.saveUser(dao.generateNewUser(email, "asdf", "Test User" + (j+1)));
+				}
+				dao.voteOnPost(email, post.getId());
+			}
+		}
+		
+		// extra posts that shouldn't be loaded from findPostsByVote() call
+		generatePosts(5);
+		
+		// reload posts since they've now been voted on
+		List<Post> votedPosts = new ArrayList<Post>(numPosts);
+		for (Post curPost : createdPosts) {
+			votedPosts.add(dao.findPost(curPost.getId()));
+		}
+		
+		List<Post> postsByVote = dao.findPostsByVote(numPosts);
+		assertThat(postsByVote, 
+				IsIterableContainingInAnyOrder.containsInAnyOrder(votedPosts.toArray()));
+		Long prevVotes = numPosts * 2L;
+		for (Post curPost : postsByVote) {
+			assertThat(curPost.getVotes(), lessThan(prevVotes));
+			prevVotes = curPost.getVotes();
+		}
+	}
+	
+	@Test
+	public void testFindPostsByVotePostNotExist() {
+		List<Post> posts = dao.findPostsByVote(10);
+		assertThat(posts.size(), equalTo(0));
+	}
+	
+	protected List<Post> generatePosts(int num) {
+		List<Post> posts = new ArrayList<Post>(num);
+		for (int i = 0; i < num; i++) {
+			Post post = dao.generateNewPost(EMAIL, NAME, "Post " + (i+1), 
+					new DateTime(), "This is post #" + (i+1));
+			dao.savePost(post);
+			posts.add(post);
+		}
+		return posts;
+	}
 }

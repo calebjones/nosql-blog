@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:mongo="http://www.springframework.org/schema/data/mongo"
+    xsi:schemaLocation="http://www.springframework.org/schema/data/mongo http://www.springframework.org/schema/data/mongo/spring-mongo-1.2.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean name="fongo" class="com.foursquare.fongo.Fongo">
+        <constructor-arg value="InMemoryMongo" />
+    </bean>
+    
+    <bean id="mongo" factory-bean="fongo" factory-method="getMongo" />
+    
+    <mongo:db-factory id="mongoDbFactory" mongo-ref="mongo" />
+    
+    <bean id="mongoTemplate" class="org.springframework.data.mongodb.core.MongoTemplate">
+        <constructor-arg ref="mongoDbFactory"/>
+    </bean>
+    
+    <bean id="mongoBlogDao" class="org.nosql.blog.mongo.BlogDaoMongoImpl">
+        <constructor-arg name="config" ref="daoConfig" />
+        <constructor-arg name="mongo" ref="mongo" />
+        <constructor-arg name="mongoOps" ref="mongoTemplate" />
+    </bean>
+
+    <bean id="daoConfig" class="org.nosql.blog.mongo.MongoBlogConfig">
+        <constructor-arg name="dbName" value="test" />
+        <constructor-arg name="postCollection" value="posts" />
+        <constructor-arg name="userCollection" value="users" />
+        <constructor-arg name="commentCollection" value="comments" />
+        <constructor-arg name="votesCollection" value="votes" />
+    </bean>
+    
+    <bean id="service" class="org.nosql.blog.service.BlogServiceImpl">
+        <constructor-arg name="dao" ref="mongoBlogDao" />
+    </bean>
+
+</beans>
